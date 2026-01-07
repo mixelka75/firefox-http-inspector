@@ -1,0 +1,38 @@
+{
+  "manifest_version": 2,
+  "name": "HTTP Отладчик",
+  "version": "2.0.0",
+  "description": "Перехват и анализ HTTP запросов/ответов с телом, заголовками и куками",
+  "author": "mixelka75",
+  "homepage_url": "https://github.com/mixelka75/firefox-http-inspector",
+  "permissions": [
+    "webRequest",
+    "webRequestBlocking",
+    "<all_urls>",
+    "tabs",
+    "storage",
+    "cookies",
+    "downloads"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "browser_action": {
+    "default_title": "HTTP Отладчик",
+    "default_popup": "popup.html"
+  },
+  "web_accessible_resources": [
+    "logs.html",
+    "popup.html",
+    "assets/*"
+  ]
+}

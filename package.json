@@ -1,0 +1,32 @@
+{
+  "name": "firefox-http-inspector",
+  "version": "2.0.0",
+  "description": "Firefox extension for HTTP request/response inspection with persistent storage",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mixelka75/firefox-http-inspector.git"
+  },
+  "author": "mixelka75",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "lucide-react": "^0.263.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.15",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.27",
+    "tailwindcss": "^3.3.3",
+    "vite": "^4.4.5"
+  }
+}
