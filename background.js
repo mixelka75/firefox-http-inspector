@@ -408,7 +408,7 @@ browser.webRequest.onHeadersReceived.addListener(
     }
   },
   { urls: ['<all_urls>'] },
-  ['responseHeaders']
+  ['responseHeaders', 'blocking']
 );
 
 // Ошибки

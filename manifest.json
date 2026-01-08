@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "HTTP Отладчик",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "browser_specific_settings": {
     "gecko": {
       "id": "{7d39ee3d-ce78-4f9e-8ee5-f2d7bbd886a3}"
