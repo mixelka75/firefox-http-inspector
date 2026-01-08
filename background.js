@@ -3,7 +3,7 @@
 
 const state = {
   logs: [],
-  isEnabled: true,
+  isEnabled: false,
   urlFilter: '',
   maxLogs: 5000,
   listeners: new Set()
@@ -52,7 +52,7 @@ async function loadLogs() {
   try {
     const data = await browser.storage.local.get(['logs', 'isEnabled', 'urlFilter']);
     state.logs = data.logs || [];
-    state.isEnabled = data.isEnabled !== false;
+    state.isEnabled = data.isEnabled === true;
     state.urlFilter = data.urlFilter || '';
   } catch (e) {
     console.error('Ошибка загрузки:', e);
