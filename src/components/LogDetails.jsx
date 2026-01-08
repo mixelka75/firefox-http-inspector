@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { getStatusClass, formatDuration } from '../utils/helpers';
 import { decodeProtobuf, looksLikeProtobuf } from '../utils/protobuf';
+import { ContentViewer } from './ContentViewer';
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
@@ -166,6 +167,64 @@ function ProtobufViewer({ base64 }) {
   );
 }
 
+function FormDataViewer({ data }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const entries = Object.entries(data || {});
+  const PREVIEW_COUNT = 5;
+  const isLarge = entries.length > PREVIEW_COUNT;
+  const displayEntries = isExpanded ? entries : entries.slice(0, PREVIEW_COUNT);
+
+  return (
+    <div className="space-y-1">
+      {displayEntries.map(([key, values]) => (
+        <div key={key} className="flex gap-2 text-xs py-1 border-b border-dark-700 last:border-0">
+          <span className="text-purple-400 font-medium min-w-[120px]">{key}:</span>
+          <span className="text-dark-200 break-all flex-1">
+            {Array.isArray(values) ? values.join(', ') : String(values)}
+          </span>
+          <CopyButton text={Array.isArray(values) ? values.join(', ') : String(values)} />
+        </div>
+      ))}
+      {isLarge && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="text-xs text-blue-400 hover:text-blue-300 mt-2"
+        >
+          {isExpanded ? 'Свернуть' : `Показать все (${entries.length} полей)`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Base64Viewer({ base64 }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const PREVIEW_LENGTH = 200;
+  const isLarge = base64 && base64.length > PREVIEW_LENGTH;
+  const displayText = isExpanded ? base64 : (base64?.substring(0, PREVIEW_LENGTH) + (isLarge ? '...' : ''));
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-orange-400 text-xs font-semibold uppercase">Base64:</span>
+        <span className="text-dark-500 text-xs">{base64?.length?.toLocaleString()} символов</span>
+        <CopyButton text={base64} />
+        {isLarge && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-xs text-blue-400 hover:text-blue-300"
+          >
+            {isExpanded ? 'Свернуть' : 'Раскрыть'}
+          </button>
+        )}
+      </div>
+      <pre className={`text-orange-300 whitespace-pre-wrap break-all text-xs bg-dark-900 p-3 rounded border-l-2 border-orange-500 ${isExpanded ? 'max-h-96' : 'max-h-24'} overflow-auto`}>
+        {displayText || '[пусто]'}
+      </pre>
+    </div>
+  );
+}
+
 function BodyViewer({ body, title }) {
   if (!body) {
     return <span className="text-dark-400 text-xs">Тело отсутствует</span>;
@@ -182,18 +241,7 @@ function BodyViewer({ body, title }) {
 
   // Form данные
   if (body.type === 'form') {
-    return (
-      <div className="space-y-1">
-        {Object.entries(body.data || {}).map(([key, values]) => (
-          <div key={key} className="flex gap-2 text-xs">
-            <span className="text-purple-400 font-medium">{key}:</span>
-            <span className="text-dark-200 break-all">
-              {Array.isArray(values) ? values.join(', ') : String(values)}
-            </span>
-          </div>
-        ))}
-      </div>
-    );
+    return <FormDataViewer data={body.data} />;
   }
 
   // Raw данные (base64 + text)
@@ -204,7 +252,7 @@ function BodyViewer({ body, title }) {
       <div className="space-y-4">
         {/* Информация */}
         <div className="flex items-center gap-4 text-xs text-dark-400">
-          {body.size !== undefined && <span>Размер: {body.size} байт</span>}
+          {body.size !== undefined && <span>Размер: {body.size.toLocaleString()} байт</span>}
           {body.contentType && <span>Content-Type: {body.contentType}</span>}
           {isProtobuf && (
             <span className="text-purple-400 bg-purple-500/20 px-2 py-0.5 rounded">Protobuf</span>
@@ -221,36 +269,24 @@ function BodyViewer({ body, title }) {
           </div>
         )}
 
-        {/* Base64 - всегда показываем */}
-        {body.base64 && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-orange-400 text-xs font-semibold uppercase">Base64:</span>
-              <CopyButton text={body.base64} />
-            </div>
-            <pre className="text-orange-300 whitespace-pre-wrap break-all text-xs bg-dark-900 p-3 rounded border-l-2 border-orange-500 max-h-48 overflow-auto">
-              {body.base64 || '[пусто]'}
-            </pre>
-          </div>
+        {/* Текст с подсветкой синтаксиса - если удалось декодировать */}
+        {body.text !== null && body.text !== undefined && body.text.length > 0 && (
+          <ContentViewer
+            content={body.text}
+            contentType={body.contentType}
+            title="Содержимое"
+          />
         )}
 
-        {/* Текст - если удалось декодировать */}
-        {body.text !== null && body.text !== undefined && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-green-400 text-xs font-semibold uppercase">Текст (UTF-8):</span>
-              <CopyButton text={body.text} />
-            </div>
-            <pre className="text-green-300 whitespace-pre-wrap break-all text-xs bg-dark-900 p-3 rounded border-l-2 border-green-500 max-h-96 overflow-auto">
-              {body.text || '[пусто]'}
-            </pre>
-          </div>
+        {/* Base64 - показываем отдельно для бинарных данных или если нет текста */}
+        {body.base64 && (body.text === null || isProtobuf) && (
+          <Base64Viewer base64={body.base64} />
         )}
 
         {/* Если текст недоступен */}
         {body.text === null && !isProtobuf && body.base64 && (
           <div className="text-dark-500 text-xs italic">
-            Не удалось декодировать как UTF-8 текст (бинарные данные)
+            Бинарные данные (не UTF-8 текст)
           </div>
         )}
       </div>
@@ -259,9 +295,10 @@ function BodyViewer({ body, title }) {
 
   // Fallback для старых данных
   return (
-    <pre className="text-dark-200 whitespace-pre-wrap break-all text-xs">
-      {JSON.stringify(body, null, 2)}
-    </pre>
+    <ContentViewer
+      content={JSON.stringify(body, null, 2)}
+      contentType="application/json"
+    />
   );
 }
 

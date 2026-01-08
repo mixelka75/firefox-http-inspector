@@ -1,25 +1,25 @@
-import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Clock, AlertCircle } from 'lucide-react';
+import React from 'react';
+import { Clock, AlertCircle } from 'lucide-react';
 import { formatTime, formatUrl, getStatusClass, getMethodColor, formatDuration } from '../utils/helpers';
-import { LogDetails } from './LogDetails';
 
-export function LogEntry({ log }) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
+export function LogEntry({ log, isSelected, onSelect }) {
   const statusCode = log.response?.statusCode;
   const hasError = log.error || !log.response;
 
   return (
-    <div className={`border-b border-dark-700 transition-colors ${isExpanded ? 'bg-dark-800' : 'hover:bg-dark-800/50'}`}>
-      {/* Заголовок */}
-      <div
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-3 px-3 py-2 cursor-pointer select-none"
-      >
-        {/* Стрелка раскрытия */}
-        <div className="text-dark-400 w-4 flex-shrink-0">
-          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </div>
+    <div
+      onClick={onSelect}
+      className={`
+        border-b border-dark-700 cursor-pointer select-none transition-colors
+        ${isSelected
+          ? 'bg-blue-500/20 border-l-2 border-l-blue-500 hover:bg-blue-500/25'
+          : 'hover:bg-dark-800/50 border-l-2 border-l-transparent'
+        }
+      `}
+    >
+      <div className="flex items-center gap-3 px-3 py-2">
+        {/* Индикатор выбора */}
+        <div className={`w-1 h-8 rounded-full flex-shrink-0 transition-colors ${isSelected ? 'bg-blue-500' : 'bg-transparent'}`} />
 
         {/* Время */}
         <span className="text-dark-400 text-xs w-24 flex-shrink-0 flex items-center gap-1">
@@ -48,7 +48,7 @@ export function LogEntry({ log }) {
         )}
 
         {/* URL */}
-        <span className="text-dark-200 truncate flex-1 min-w-0" title={log.url}>
+        <span className={`truncate flex-1 min-w-0 ${isSelected ? 'text-dark-100' : 'text-dark-200'}`} title={log.url}>
           {formatUrl(log.url, 100)}
         </span>
 
@@ -75,9 +75,6 @@ export function LogEntry({ log }) {
           </span>
         )}
       </div>
-
-      {/* Детали */}
-      {isExpanded && <LogDetails log={log} />}
     </div>
   );
 }

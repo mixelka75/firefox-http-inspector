@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { LogEntry } from './LogEntry';
 import { Loader2, Inbox } from 'lucide-react';
 
-export function LogsList({ logs, isLoading }) {
+export function LogsList({ logs, isLoading, selectedLogId, onSelectLog }) {
   const containerRef = useRef(null);
   const shouldScrollRef = useRef(true);
 
@@ -53,7 +53,12 @@ export function LogsList({ logs, isLoading }) {
       className="h-full overflow-y-auto"
     >
       {reversedLogs.map((log) => (
-        <LogEntry key={log.id} log={log} />
+        <LogEntry
+          key={log.id}
+          log={log}
+          isSelected={log.id === selectedLogId}
+          onSelect={() => onSelectLog(log.id)}
+        />
       ))}
     </div>
   );
