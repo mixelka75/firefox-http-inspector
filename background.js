@@ -190,7 +190,75 @@ browser.webRequest.onHeadersReceived.addListener(
       h => h.name.toLowerCase() === 'content-type'
     )?.value || '';
 
-    // Перехватываем тело ответа для ВСЕХ запросов
+    const contentLength = details.responseHeaders?.find(
+      h => h.name.toLowerCase() === 'content-length'
+    )?.value;
+
+    // OPTIONS запросы (CORS preflight) обычно не имеют тела
+    if (details.method === 'OPTIONS') {
+      data.timing.end = Date.now();
+      addLog({
+        id: data.id,
+        timestamp: new Date().toISOString(),
+        url: data.url,
+        method: data.method,
+        resourceType: data.type,
+        requestId: data.requestId,
+        tabId: data.tabId,
+        request: {
+          headers: data.requestHeaders || [],
+          cookies: data.requestCookies || [],
+          body: data.requestBody
+        },
+        response: {
+          statusCode: data.statusCode,
+          statusLine: data.statusLine,
+          headers: data.responseHeaders || [],
+          cookies: data.responseCookies || [],
+          body: { type: 'empty', reason: 'CORS preflight (OPTIONS)' }
+        },
+        timing: {
+          duration: data.timing.end - data.timing.start,
+          ttfb: data.timing.headersReceived - data.timing.start
+        }
+      });
+      requestData.delete(details.requestId);
+      return;
+    }
+
+    // 204 No Content - нет тела
+    if (details.statusCode === 204 || contentLength === '0') {
+      data.timing.end = Date.now();
+      addLog({
+        id: data.id,
+        timestamp: new Date().toISOString(),
+        url: data.url,
+        method: data.method,
+        resourceType: data.type,
+        requestId: data.requestId,
+        tabId: data.tabId,
+        request: {
+          headers: data.requestHeaders || [],
+          cookies: data.requestCookies || [],
+          body: data.requestBody
+        },
+        response: {
+          statusCode: data.statusCode,
+          statusLine: data.statusLine,
+          headers: data.responseHeaders || [],
+          cookies: data.responseCookies || [],
+          body: { type: 'empty', reason: details.statusCode === 204 ? '204 No Content' : 'Content-Length: 0' }
+        },
+        timing: {
+          duration: data.timing.end - data.timing.start,
+          ttfb: data.timing.headersReceived - data.timing.start
+        }
+      });
+      requestData.delete(details.requestId);
+      return;
+    }
+
+    // Перехватываем тело ответа для остальных запросов
     try {
       const filter = browser.webRequest.filterResponseData(details.requestId);
       const chunks = [];
@@ -262,7 +330,16 @@ browser.webRequest.onHeadersReceived.addListener(
       };
 
       filter.onerror = (e) => {
-        // Если фильтр не сработал, всё равно логируем без тела ответа
+        // Определяем причину ошибки
+        let reason = 'Фильтр недоступен';
+        if (data.url.includes('service-worker')) {
+          reason = 'Service Worker (браузер блокирует)';
+        } else if (data.type === 'websocket') {
+          reason = 'WebSocket соединение';
+        } else if (filter.error) {
+          reason = filter.error;
+        }
+
         addLog({
           id: data.id,
           timestamp: new Date().toISOString(),
@@ -281,15 +358,27 @@ browser.webRequest.onHeadersReceived.addListener(
             statusLine: data.statusLine,
             headers: data.responseHeaders || [],
             cookies: data.responseCookies || [],
-            body: { type: 'error', error: 'Не удалось перехватить тело' }
+            body: { type: 'unavailable', reason }
           },
-          timing: null
+          timing: {
+            duration: Date.now() - data.timing.start,
+            ttfb: data.timing.headersReceived - data.timing.start
+          }
         });
         requestData.delete(details.requestId);
         filter.close();
       };
     } catch (e) {
       // Фильтр не поддерживается для этого запроса
+      let reason = e.message;
+      if (data.url.includes('service-worker')) {
+        reason = 'Service Worker (браузер блокирует)';
+      } else if (data.type === 'websocket') {
+        reason = 'WebSocket соединение';
+      } else if (e.message.includes('Invalid request')) {
+        reason = 'Запрос уже завершён';
+      }
+
       addLog({
         id: data.id,
         timestamp: new Date().toISOString(),
@@ -308,9 +397,12 @@ browser.webRequest.onHeadersReceived.addListener(
           statusLine: data.statusLine,
           headers: data.responseHeaders || [],
           cookies: data.responseCookies || [],
-          body: { type: 'unavailable', reason: e.message }
+          body: { type: 'unavailable', reason }
         },
-        timing: null
+        timing: {
+          duration: Date.now() - data.timing.start,
+          ttfb: data.timing.headersReceived - data.timing.start
+        }
       });
       requestData.delete(details.requestId);
     }

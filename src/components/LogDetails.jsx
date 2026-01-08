@@ -230,11 +230,32 @@ function BodyViewer({ body, title }) {
     return <span className="text-dark-400 text-xs">Тело отсутствует</span>;
   }
 
-  // Ошибка или недоступно
-  if (body.type === 'error' || body.type === 'unavailable') {
+  // Пустое тело (OPTIONS, 204, и т.д.)
+  if (body.type === 'empty') {
     return (
-      <div className="text-red-400 text-xs">
-        {body.error || body.reason || 'Не удалось получить тело'}
+      <div className="flex items-center gap-2 text-dark-500 text-xs">
+        <span className="bg-dark-700 px-2 py-1 rounded">Пустое тело</span>
+        <span className="text-dark-400">{body.reason}</span>
+      </div>
+    );
+  }
+
+  // Недоступно (service worker, websocket, и т.д.)
+  if (body.type === 'unavailable') {
+    return (
+      <div className="flex items-center gap-2 text-amber-500 text-xs">
+        <span className="bg-amber-500/20 px-2 py-1 rounded">Недоступно</span>
+        <span className="text-dark-400">{body.reason}</span>
+      </div>
+    );
+  }
+
+  // Ошибка
+  if (body.type === 'error') {
+    return (
+      <div className="flex items-center gap-2 text-red-400 text-xs">
+        <span className="bg-red-500/20 px-2 py-1 rounded">Ошибка</span>
+        <span>{body.error || 'Не удалось получить тело'}</span>
       </div>
     );
   }
