@@ -5,11 +5,12 @@ const state = {
   logs: [],
   isEnabled: true,
   urlFilter: '',
-  maxLogs: 10000,
+  maxLogs: 5000,
   listeners: new Set()
 };
 
 const requestData = new Map();
+const pendingLogs = new Map(); // Для объединения запроса и ответа
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
 
@@ -166,20 +167,7 @@ browser.webRequest.onSendHeaders.addListener(
     if (data) {
       data.requestHeaders = details.requestHeaders;
       data.requestCookies = parseCookies(details.requestHeaders);
-
-      addLog({
-        id: data.id + '-req',
-        type: 'request',
-        timestamp: new Date().toISOString(),
-        url: data.url,
-        method: data.method,
-        resourceType: data.type,
-        requestId: data.requestId,
-        tabId: data.tabId,
-        headers: data.requestHeaders,
-        cookies: data.requestCookies,
-        body: data.requestBody
-      });
+      // Не добавляем лог здесь - ждём ответа
     }
   },
   { urls: ['<all_urls>'] },
@@ -240,20 +228,29 @@ browser.webRequest.onHeadersReceived.addListener(
 
         data.timing.end = Date.now();
 
+        // Объединённый лог запроса и ответа
         addLog({
-          id: data.id + '-res',
-          type: 'response',
+          id: data.id,
           timestamp: new Date().toISOString(),
           url: data.url,
           method: data.method,
           resourceType: data.type,
           requestId: data.requestId,
           tabId: data.tabId,
-          statusCode: data.statusCode,
-          statusLine: data.statusLine,
-          headers: data.responseHeaders,
-          cookies: data.responseCookies,
-          body: data.responseBody,
+          // Запрос
+          request: {
+            headers: data.requestHeaders || [],
+            cookies: data.requestCookies || [],
+            body: data.requestBody
+          },
+          // Ответ
+          response: {
+            statusCode: data.statusCode,
+            statusLine: data.statusLine,
+            headers: data.responseHeaders || [],
+            cookies: data.responseCookies || [],
+            body: data.responseBody
+          },
           timing: {
             duration: data.timing.end - data.timing.start,
             ttfb: data.timing.headersReceived - data.timing.start
@@ -265,21 +262,27 @@ browser.webRequest.onHeadersReceived.addListener(
       };
 
       filter.onerror = (e) => {
-        // Если фильтр не сработал, всё равно логируем ответ без тела
+        // Если фильтр не сработал, всё равно логируем без тела ответа
         addLog({
-          id: data.id + '-res',
-          type: 'response',
+          id: data.id,
           timestamp: new Date().toISOString(),
           url: data.url,
           method: data.method,
           resourceType: data.type,
           requestId: data.requestId,
           tabId: data.tabId,
-          statusCode: data.statusCode,
-          statusLine: data.statusLine,
-          headers: data.responseHeaders,
-          cookies: data.responseCookies,
-          body: { type: 'error', error: 'Не удалось перехватить тело' },
+          request: {
+            headers: data.requestHeaders || [],
+            cookies: data.requestCookies || [],
+            body: data.requestBody
+          },
+          response: {
+            statusCode: data.statusCode,
+            statusLine: data.statusLine,
+            headers: data.responseHeaders || [],
+            cookies: data.responseCookies || [],
+            body: { type: 'error', error: 'Не удалось перехватить тело' }
+          },
           timing: null
         });
         requestData.delete(details.requestId);
@@ -288,19 +291,25 @@ browser.webRequest.onHeadersReceived.addListener(
     } catch (e) {
       // Фильтр не поддерживается для этого запроса
       addLog({
-        id: data.id + '-res',
-        type: 'response',
+        id: data.id,
         timestamp: new Date().toISOString(),
         url: data.url,
         method: data.method,
         resourceType: data.type,
         requestId: data.requestId,
         tabId: data.tabId,
-        statusCode: data.statusCode,
-        statusLine: data.statusLine,
-        headers: data.responseHeaders,
-        cookies: data.responseCookies,
-        body: { type: 'unavailable', reason: e.message },
+        request: {
+          headers: data.requestHeaders || [],
+          cookies: data.requestCookies || [],
+          body: data.requestBody
+        },
+        response: {
+          statusCode: data.statusCode,
+          statusLine: data.statusLine,
+          headers: data.responseHeaders || [],
+          cookies: data.responseCookies || [],
+          body: { type: 'unavailable', reason: e.message }
+        },
         timing: null
       });
       requestData.delete(details.requestId);
@@ -316,15 +325,21 @@ browser.webRequest.onErrorOccurred.addListener(
     const data = requestData.get(details.requestId);
     if (data) {
       addLog({
-        id: data.id + '-err',
-        type: 'error',
+        id: data.id,
         timestamp: new Date().toISOString(),
         url: data.url,
         method: data.method,
         resourceType: data.type,
         requestId: data.requestId,
         tabId: data.tabId,
-        error: details.error
+        request: {
+          headers: data.requestHeaders || [],
+          cookies: data.requestCookies || [],
+          body: data.requestBody
+        },
+        response: null,
+        error: details.error,
+        timing: null
       });
       requestData.delete(details.requestId);
     }
@@ -369,15 +384,22 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ success: true });
       break;
     case 'form-submit':
-      // Отправка формы
+      // Отправка формы (только данные формы, ответ придёт через webRequest)
       addLog({
-        id: generateId() + '-form',
-        type: 'form',
+        id: generateId(),
         timestamp: message.data.timestamp,
         url: message.data.action,
-        method: message.data.method,
+        method: message.data.method?.toUpperCase() || 'POST',
+        resourceType: 'form-submit',
         tabId: sender.tab?.id,
-        body: { type: 'form', data: message.data.formData }
+        source: 'form-event',
+        request: {
+          headers: [],
+          cookies: [],
+          body: { type: 'form', data: message.data.formData }
+        },
+        response: null, // Ответ придёт отдельно через webRequest
+        timing: null
       });
       sendResponse({ success: true });
       break;
@@ -391,60 +413,53 @@ function handlePageRequest(message, sender) {
   const subtype = message.subtype;
 
   if (subtype === '__HTTP_DEBUG_FETCH__' || subtype === '__HTTP_DEBUG_XHR__') {
-    const logId = generateId();
-
-    // Добавляем лог запроса с данными от content script
-    if (data.requestBase64 || data.requestText) {
-      addLog({
-        id: logId + '-req-page',
-        type: 'request',
-        timestamp: data.timestamp,
-        url: data.url,
-        method: data.method,
-        resourceType: subtype.includes('FETCH') ? 'fetch' : 'xhr',
-        tabId: sender.tab?.id,
+    // Объединённый лог от content script
+    addLog({
+      id: generateId(),
+      timestamp: data.timestamp,
+      url: data.url,
+      method: data.method,
+      resourceType: subtype.includes('FETCH') ? 'fetch' : 'xhr',
+      tabId: sender.tab?.id,
+      source: 'content-script',
+      request: {
         headers: [],
         cookies: [],
-        body: {
+        body: (data.requestBase64 || data.requestText) ? {
           type: 'raw',
           base64: data.requestBase64,
           text: data.requestText,
           size: data.requestBase64 ? Math.ceil(data.requestBase64.length * 3 / 4) : 0
+        } : null
+      },
+      response: {
+        statusCode: data.status,
+        statusLine: `HTTP ${data.status} ${data.statusText}`,
+        headers: [],
+        cookies: [],
+        body: {
+          type: 'raw',
+          base64: data.responseBase64,
+          text: data.responseText,
+          size: data.responseSize || 0,
+          contentType: data.contentType || ''
         }
-      });
-    }
-
-    // Добавляем лог ответа с данными от content script
-    addLog({
-      id: logId + '-res-page',
-      type: 'response',
-      timestamp: data.timestamp,
-      url: data.url,
-      method: data.method,
-      statusCode: data.status,
-      statusLine: `HTTP ${data.status} ${data.statusText}`,
-      resourceType: subtype.includes('FETCH') ? 'fetch' : 'xhr',
-      tabId: sender.tab?.id,
-      headers: [],
-      cookies: [],
-      body: {
-        type: 'raw',
-        base64: data.responseBase64,
-        text: data.responseText,
-        size: data.responseSize || 0,
-        contentType: data.contentType || ''
       },
       timing: { duration: data.duration }
     });
   } else if (subtype === '__HTTP_DEBUG_FETCH_ERROR__' || subtype === '__HTTP_DEBUG_XHR_ERROR__') {
     addLog({
-      id: generateId() + '-err',
-      type: 'error',
+      id: generateId(),
       timestamp: data.timestamp,
       url: data.url,
       method: data.method,
+      resourceType: subtype.includes('FETCH') ? 'fetch' : 'xhr',
       tabId: sender.tab?.id,
-      error: data.error
+      source: 'content-script',
+      request: { headers: [], cookies: [], body: null },
+      response: null,
+      error: data.error,
+      timing: null
     });
   }
 }

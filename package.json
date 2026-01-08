@@ -11,14 +11,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && cp background.js content.js dist/",
     "build:watch": "vite build --watch",
+    "sign": "npm run build && cd dist && web-ext sign --channel=unlisted && cp web-ext-artifacts/*.xpi ../http-debugger-signed.xpi",
     "preview": "vite preview"
   },
   "dependencies": {
+    "lucide-react": "^0.263.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "lucide-react": "^0.263.1"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",
@@ -27,6 +28,7 @@
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.27",
     "tailwindcss": "^3.3.3",
-    "vite": "^4.4.5"
+    "vite": "^4.4.5",
+    "web-ext": "^9.2.0"
   }
 }

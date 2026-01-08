@@ -2,6 +2,11 @@
   "manifest_version": 2,
   "name": "HTTP Отладчик",
   "version": "2.0.0",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{7d39ee3d-ce78-4f9e-8ee5-f2d7bbd886a3}"
+    }
+  },
   "description": "Перехват и анализ HTTP запросов/ответов с телом, заголовками и куками",
   "author": "mixelka75",
   "homepage_url": "https://github.com/mixelka75/firefox-http-inspector",

@@ -166,7 +166,7 @@ function ProtobufViewer({ base64 }) {
   );
 }
 
-function BodyViewer({ body }) {
+function BodyViewer({ body, title }) {
   if (!body) {
     return <span className="text-dark-400 text-xs">Тело отсутствует</span>;
   }
@@ -222,15 +222,17 @@ function BodyViewer({ body }) {
         )}
 
         {/* Base64 - всегда показываем */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-orange-400 text-xs font-semibold uppercase">Base64:</span>
-            <CopyButton text={body.base64} />
+        {body.base64 && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-orange-400 text-xs font-semibold uppercase">Base64:</span>
+              <CopyButton text={body.base64} />
+            </div>
+            <pre className="text-orange-300 whitespace-pre-wrap break-all text-xs bg-dark-900 p-3 rounded border-l-2 border-orange-500 max-h-48 overflow-auto">
+              {body.base64 || '[пусто]'}
+            </pre>
           </div>
-          <pre className="text-orange-300 whitespace-pre-wrap break-all text-xs bg-dark-900 p-3 rounded border-l-2 border-orange-500 max-h-48 overflow-auto">
-            {body.base64 || '[пусто]'}
-          </pre>
-        </div>
+        )}
 
         {/* Текст - если удалось декодировать */}
         {body.text !== null && body.text !== undefined && (
@@ -246,7 +248,7 @@ function BodyViewer({ body }) {
         )}
 
         {/* Если текст недоступен */}
-        {body.text === null && !isProtobuf && (
+        {body.text === null && !isProtobuf && body.base64 && (
           <div className="text-dark-500 text-xs italic">
             Не удалось декодировать как UTF-8 текст (бинарные данные)
           </div>
@@ -264,6 +266,8 @@ function BodyViewer({ body }) {
 }
 
 export function LogDetails({ log }) {
+  const statusCode = log.response?.statusCode;
+
   return (
     <div className="px-4 py-3 bg-dark-900 border-t border-dark-700 space-y-3">
       {/* Основная информация */}
@@ -280,11 +284,11 @@ export function LogDetails({ log }) {
               <span className="text-orange-400 font-semibold">{log.method}</span>
             </div>
           )}
-          {log.statusCode && (
+          {statusCode && (
             <div className="flex gap-2">
               <span className="text-dark-400 w-28">Статус:</span>
-              <span className={`font-semibold ${getStatusClass(log.statusCode)}`}>
-                {log.statusCode} {log.statusLine?.split(' ').slice(1).join(' ')}
+              <span className={`font-semibold ${getStatusClass(statusCode)}`}>
+                {statusCode} {log.response?.statusLine?.split(' ').slice(1).join(' ')}
               </span>
             </div>
           )}
@@ -325,30 +329,51 @@ export function LogDetails({ log }) {
         </div>
       </Section>
 
-      {/* Заголовки */}
-      {log.headers && log.headers.length > 0 && (
-        <Section
-          title={log.type === 'request' ? 'Заголовки запроса' : 'Заголовки ответа'}
-          count={log.headers.length}
-        >
-          <HeadersTable headers={log.headers} />
+      {/* Заголовки запроса */}
+      {log.request?.headers && log.request.headers.length > 0 && (
+        <Section title="Заголовки запроса" count={log.request.headers.length}>
+          <HeadersTable headers={log.request.headers} />
         </Section>
       )}
 
-      {/* Куки */}
-      {log.cookies && log.cookies.length > 0 && (
-        <Section title="Куки" count={log.cookies.length} defaultOpen={false}>
-          <CookiesTable cookies={log.cookies} />
+      {/* Куки запроса */}
+      {log.request?.cookies && log.request.cookies.length > 0 && (
+        <Section title="Куки запроса" count={log.request.cookies.length} defaultOpen={false}>
+          <CookiesTable cookies={log.request.cookies} />
         </Section>
       )}
 
-      {/* Тело */}
-      {log.body && (
+      {/* Тело запроса */}
+      {log.request?.body && (
         <Section
-          title={log.type === 'request' ? 'Тело запроса' : 'Тело ответа'}
-          badge={log.body.size ? `${log.body.size} байт` : null}
+          title="Тело запроса"
+          badge={log.request.body.size ? `${log.request.body.size} байт` : null}
         >
-          <BodyViewer body={log.body} />
+          <BodyViewer body={log.request.body} title="Запрос" />
+        </Section>
+      )}
+
+      {/* Заголовки ответа */}
+      {log.response?.headers && log.response.headers.length > 0 && (
+        <Section title="Заголовки ответа" count={log.response.headers.length}>
+          <HeadersTable headers={log.response.headers} />
+        </Section>
+      )}
+
+      {/* Куки ответа */}
+      {log.response?.cookies && log.response.cookies.length > 0 && (
+        <Section title="Куки ответа" count={log.response.cookies.length} defaultOpen={false}>
+          <CookiesTable cookies={log.response.cookies} />
+        </Section>
+      )}
+
+      {/* Тело ответа */}
+      {log.response?.body && (
+        <Section
+          title="Тело ответа"
+          badge={log.response.body.size ? `${log.response.body.size} байт` : null}
+        >
+          <BodyViewer body={log.response.body} title="Ответ" />
         </Section>
       )}
     </div>
